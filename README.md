@@ -1,6 +1,6 @@
 # 🧺 Smart Laundry Web Application
 
-Aplikasi manajemen layanan laundry berbasis web yang dikembangkan secara mandiri untuk memenuhi Tugas Besar Mata Kuliah **Cyber Security**.
+Aplikasi manajemen layanan laundry berbasis web yang dikembangkan untuk memenuhi Tugas Mata Kuliah **Cyber Security**.
 
 ---
 
@@ -12,47 +12,48 @@ Aplikasi manajemen layanan laundry berbasis web yang dikembangkan secara mandiri
 5. [Konfigurasi Environment Variable](#-konfigurasi-environment-variable)
 6. [Cara Instalasi & Menjalankan Secara Lokal](#-cara-instalasi--menjalankan-secara-lokal)
 7. [Penerapan Keamanan (Cyber Security)](#-penerapan-keamanan-cyber-security)
-8. [Penggunaan AI Agent](#-penggunaan-ai-agent)
+8. [Penggunaan AI Collaborator / Agent](#-penggunaan-ai-collaborator--agent)
 9. [Ringkasan Self-Testing Keamanan](#-ringkasan-self-testing-keamanan)
 
 ---
 
 ## 📌 1. Deskripsi Aplikasi
-**Smart Laundry** adalah sistem informasi manajemen laundry berbasis web yang dirancang untuk mengoptimalkan proses pemesanan cucian kiloan secara digital. Aplikasi ini menyediakan dua hak akses utama, yaitu **Pelanggan (Member/Non-Member)** yang dapat melakukan pemesanan, penukaran poin, pelacakan status cucian, serta **Administrator** yang mengelola antrean operasional, verifikasi pembayaran digital, dan rekapitulasi omzet bulanan secara *real-time*.
+**Smart Laundry** adalah sistem informasi manajemen laundry berbasis web yang dirancang untuk mengoptimalkan proses pemesanan cucian kiloan secara digital. Aplikasi ini menyediakan dua hak akses utama, yaitu **Pelanggan (Member/Non-Member)** yang dapat melakukan pemesanan, penukaran poin, pelacakan status cucian, serta **Administrator** yang mengelola antrean operasional, verifikasi pembayaran digital, manajemen masa aktif keanggotaan (membership), dan rekapitulasi omzet bulanan secara *real-time*.
 
 ---
 
 ## 🚀 2. Fitur Utama
-* **Autentikasi & Otorisasi Pengguna:** Sistem registrasi dan login terpisah dengan hak akses terproteksi antara Pelanggan dan Admin[cite: 2, 3].
-* **Pengelolaan Data (CRUD):** Operasi data lengkap mencakup pembuatan pesanan, perubahan status pengerjaan, penghapusan data aman (*soft-delete*), dan persetujuan member baru[cite: 2, 3].
-* **Sistem Pembayaran Fleksibel:** Mendukung Bayar di Tempat (Tunai), Transfer Bank, dan QRIS dengan fitur unggah bukti transaksi serta verifikasi admin.
-* **Sistem Poin & Diskon Member:** Pelanggan member mendapatkan diskon 10% dan akumulasi poin yang dapat ditukarkan menjadi potongan harga.
-* **Dashboard Omzet & Laporan:** Rekapitulasi pemasukan bulanan dan total berat produksi secara otomatis[cite: 2, 3].
+- **Autentikasi & Otorisasi Pengguna:** Sistem registrasi dan login terpisah dengan hak akses terproteksi antara Pelanggan dan Admin menggunakan sesi aman (*session management*).
+- **Pengelolaan Data (CRUD):** Operasi data lengkap mencakup pembuatan pesanan, perubahan status pengerjaan, penghapusan data aman berbasis *soft-delete* (mengarsipkan transaksi selesai tanpa merusak relasi database), dan persetujuan member baru.
+- **Sistem Pembayaran Fleksibel:** Mendukung Bayar di Tempat (Tunai), Transfer Bank, dan QRIS dengan fitur unggah bukti transaksi serta verifikasi admin.
+- **Sistem Poin & Diskon Member:** Pelanggan member mendapatkan diskon 10% dan akumulasi poin yang dapat ditukarkan menjadi potongan harga.
+- **Manajemen Masa Aktif Membership (1 Bulan):** Fitur otomatis yang memvalidasi masa keanggotaan member selama 30 hari sejak pendaftaran (`INTERVAL 1 MONTH`), dan secara otomatis memperbarui status menjadi *Expired* tanpa menghapus riwayat transaksi.
+- **Dashboard Omzet & Laporan:** Rekapitulasi pemasukan bulanan dan total berat produksi secara otomatis berdasarkan data transaksi yang valid.
 
 ---
 
 ## 🛠️ 3. Teknologi yang Digunakan
-* **Bahasa Pemrograman:** PHP Native (OOP & Procedural MySQLi)
-* **Frontend Framework:** Tailwind CSS & FontAwesome Icons
-* **Manajemen Database:** MySQL / MariaDB (XAMPP / Local Server)
-* **Deployment & Hosting:** [Sebutkan nama hosting, misal: Railway / Render / Vercel][cite: 3]
+- **Bahasa Pemrograman:** PHP Native (OOP & Procedural MySQLi)
+- **Frontend Framework:** Tailwind CSS & FontAwesome Icons
+- **Manajemen Database:** MySQL / MariaDB (XAMPP / Railway MySQL Service)
+- **Deployment & Hosting:** Railway Cloud Platform
 
 ---
 
 ## 🌐 4. URL Aplikasi Aktif
-* **Aplikasi Publik:** [https://nama-aplikasi.example.com] *(Akan diisi setelah dideploy)*[cite: 4]
-* **Akun Uji Coba (Login):**
-  * **Admin:** Username: `admin` / Password: `adminpassword`[cite: 4]
-  * **Member:** Username/No. Telp terdaftar / Password terdaftar[cite: 4]
+- **Aplikasi Publik (Live Demo):** [https://smartlaundry-production-a7e5d258.up.railway.app](https://smartlaundry-production-a7e5d258.up.railway.app)[cite: 3]
+- **Akun Uji Coba (Login Admin):**
+  * **Dashboard Admin:** Akses melalui direktori `/admin/` dengan kredensial administrator yang terdaftar di database.
 
 ---
 
 ## ⚙️ 5. Konfigurasi Environment Variable
-Untuk menjaga kerahasiaan kredensial database sesuai standar *secure coding*, aplikasi ini membaca konfigurasi melalui variabel lingkungan sistem (`getenv()`). 
+Untuk menjaga kerahasiaan kredensial database sesuai standar *secure coding*, aplikasi ini membaca konfigurasi melalui variabel lingkungan sistem (`getenv()`) agar terhindar dari hardcode password di dalam source code.
 
-Berikut adalah contoh struktur variabel lingkungan yang perlu diset pada server hosting atau file konfigurasi lokal:
+Struktur environment variable yang digunakan pada server Railway:
 ```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASS=
-DB_NAME=smart_laundry
+MYSQLHOST=your_host_address
+MYSQLUSER=root
+MYSQLPASSWORD=your_secure_password
+MYSQLDATABASE=railway
+MYSQLPORT=3306
