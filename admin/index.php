@@ -7,6 +7,13 @@ if (!isset($_SESSION['admin_logged_in'])) {
 require '../koneksi.php';
 
 // ==========================================
+// 0. LOGIKA OTOMATIS EXPIRED MEMBERSHIP (1 BULAN)
+// ==========================================
+// Otomatis mengubah status member dari 'Aktif' menjadi 'Expired' 
+// jika tanggal pendaftaran sudah lebih dari 1 bulan (30 hari)
+$conn->query("UPDATE member SET status_member = 'Expired' WHERE status_member = 'Aktif' AND tanggal_daftar <= (NOW() - INTERVAL 1 MONTH)");
+
+// ==========================================
 // 1. PROSES AKSI DATA (POST NATIVE WITH SOFT-DELETE)
 // ==========================================
 
@@ -48,7 +55,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action_member'])) {
 // 2. QUERY RETRIEVE DATA STATISTIK BULANAN
 // ==========================================
 
-// A. Hitung Total Omzet Bulan Ini (Terhitung sejak pesanan disetujui/diproses, bukan menunggu konfirmasi)
+// A. Hitung Total Omzet Bulan Ini
 $query_omzet = "SELECT SUM(total_harga) AS total FROM pesanan 
                 WHERE MONTH(tanggal_pesan) = MONTH(CURRENT_DATE()) 
                 AND YEAR(tanggal_pesan) = YEAR(CURRENT_DATE())
@@ -57,7 +64,7 @@ $query_omzet = "SELECT SUM(total_harga) AS total FROM pesanan
 $res_omzet = $conn->query($query_omzet)->fetch_assoc();
 $total_omzet = $res_omzet['total'] ?? 0;
 
-// B. Hitung Berat Produksi (Kg) Bulan Ini (Terhitung sejak pesanan disetujui/diproses)
+// B. Hitung Berat Produksi (Kg) Bulan Ini
 $query_kg = "SELECT SUM(jumlah_kg) AS total_kg FROM pesanan 
              WHERE MONTH(tanggal_pesan) = MONTH(CURRENT_DATE()) 
              AND YEAR(tanggal_pesan) = YEAR(CURRENT_DATE())
@@ -66,7 +73,7 @@ $query_kg = "SELECT SUM(jumlah_kg) AS total_kg FROM pesanan
 $res_kg = $conn->query($query_kg)->fetch_assoc();
 $total_kg = $res_kg['total_kg'] ?? 0;
 
-// C. Hitung Total Member Aktif
+// C. Hitung Total Member Aktif (Hanya yang statusnya benar-benar Aktif dan belum expired)
 $query_tot_member = "SELECT COUNT(*) AS total FROM member WHERE status_member = 'Aktif'";
 $res_tot_member = $conn->query($query_tot_member)->fetch_assoc();
 $total_member_aktif = $res_tot_member['total'] ?? 0;
@@ -75,7 +82,11 @@ $total_member_aktif = $res_tot_member['total'] ?? 0;
 $query_member = "SELECT * FROM member WHERE status_member = 'Pending' ORDER BY id ASC";
 $result_member = $conn->query($query_member);
 
-// E. Ambil Data Pesanan Transaksi Aktif (Kecuali yang berstatus 'Dihapus_Selesai')
+// E. Ambil Data Member Aktif
+$query_member_aktif = "SELECT * FROM member WHERE status_member = 'Aktif' ORDER BY id ASC";
+$result_member_aktif = $conn->query($query_member_aktif);
+
+// F. Ambil Data Pesanan Transaksi Aktif
 $query_pesanan = "SELECT p.*, m.poin AS member_poin, m.no_whatsapp 
                   FROM pesanan p 
                   LEFT JOIN member m ON p.member_id = m.id 
@@ -88,9 +99,8 @@ $result_pesanan = $conn->query($query_pesanan);
 // ==========================================
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 
-// Sinkronisasi Judul Topbar Halaman Aktif
 $header_title = "Kelola Data Laundry";
-if ($page == 'member') { $header_title = "Persetujuan Member Baru"; }
+if ($page == 'member') { $header_title = "Kelola & Persetujuan Member"; }
 if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
 ?>
 
@@ -109,7 +119,7 @@ if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
     <aside class="w-64 bg-gray-900 text-white flex flex-col hidden md:flex shrink-0">
         <div class="h-16 flex items-center justify-center border-b border-gray-700 bg-gray-800">
             <h1 class="text-sm font-bold tracking-wider uppercase text-blue-400 text-center px-2">
-                <i class="fas fa-tshirt"></i> Dashboard Admin Laundry
+                <i class="fas fa-tshirt"></i> Dashboard Admin
             </h1>
         </div>
         <nav class="flex-1 px-4 py-6 space-y-2">
@@ -117,7 +127,7 @@ if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
                 <i class="fas fa-chart-line w-5"></i> Kelola Data Laundry
             </a>
             <a href="index.php?page=member" class="flex items-center gap-3 px-4 py-3 rounded-lg text-white font-medium transition <?= $page == 'member' ? 'bg-blue-600 shadow' : 'hover:bg-gray-800 text-gray-300' ?>">
-                <i class="fas fa-user-clock w-5"></i> Persetujuan Member
+                <i class="fas fa-users w-5"></i> Kelola Member
             </a>
             <a href="index.php?page=transaksi" class="flex items-center gap-3 px-4 py-3 rounded-lg text-white font-medium transition <?= $page == 'transaksi' ? 'bg-blue-600 shadow' : 'hover:bg-gray-800 text-gray-300' ?>">
                 <i class="fas fa-list-alt w-5"></i> Kelola Antrean
@@ -142,7 +152,7 @@ if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
 
         <div class="p-8 flex-1">
             <?php if ($page == 'dashboard'): ?>
-                <!-- VIEW MENU 1: PANTAU OMZET (DASHBOARD) -->
+                <!-- VIEW MENU 1: DASHBOARD -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex items-center justify-between">
                         <div>
@@ -172,62 +182,114 @@ if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
                         </div>
                     </div>
                 </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                    <h4 class="text-base font-bold text-blue-900 mb-1"><i class="fas fa-info-circle"></i> Catatan Sistem Informasi Pemilik:</h4>
-                    <p class="text-sm text-blue-800 leading-relaxed">Akumulasi pemasukan (*omzet*) dan berat produksi di atas otomatis terhitung sejak pesanan divalidasi/disetujui oleh admin (status Diproses dan seterusnya) hingga selesai, mencerminkan arus kas pemasukan real-time.</p>
-                </div>
 
             <?php elseif ($page == 'member'): ?>
-                <!-- VIEW MENU 2: PERSETUJUAN MEMBER -->
-                <div class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full leading-normal text-left">
-                            <thead>
-                                <tr class="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider font-bold border-b border-gray-200">
-                                    <th class="px-6 py-4">Nama Pendaftar</th>
-                                    <th class="px-6 py-4">Nomor WhatsApp</th>
-                                    <th class="px-6 py-4 text-center">Aksi Verifikasi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="text-sm">
-                                <?php if($result_member->num_rows > 0): ?>
-                                    <?php while($row_m = $result_member->fetch_assoc()): ?>
-                                    <tr class="hover:bg-yellow-50/50 transition border-b border-gray-100">
-                                        <td class="px-6 py-4 font-bold text-gray-800"><?= htmlspecialchars($row_m['nama']) ?></td>
-                                        <td class="px-6 py-4 text-blue-600 font-semibold">
-                                            <a href="https://wa.me/<?= htmlspecialchars($row_m['no_whatsapp']) ?>" target="_blank" class="hover:underline">
-                                                <i class="fab fa-whatsapp text-green-500"></i> <?= htmlspecialchars($row_m['no_whatsapp']) ?>
-                                            </a>
-                                        </td>
-                                        <td class="px-6 py-4 text-center">
-                                            <form method="POST" action="" class="flex justify-center gap-2">
-                                                <input type="hidden" name="id_member" value="<?= $row_m['id'] ?>">
-                                                <input type="hidden" name="action_member" value="1">
-                                                <button type="submit" name="status_baru" value="Aktif" class="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">
-                                                    <i class="fas fa-check"></i> Setujui
-                                                </button>
-                                                <button type="submit" name="status_baru" value="Ditolak" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition" onclick="return confirm('Yakin menolak pendaftaran ini?');">
-                                                    <i class="fas fa-times"></i> Tolak
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    <?php endwhile; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="3" class="px-6 py-8 text-center text-gray-400 font-medium bg-gray-50/50">
-                                            <i class="fas fa-check-circle text-gray-300 text-3xl mb-2 block"></i>
-                                            Tidak ada permintaan pendaftaran member baru saat ini.
-                                        </td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                <!-- VIEW MENU 2: KELOLA MEMBER & PERSETUJUAN -->
+                <div class="space-y-8">
+                    
+                    <!-- BAGIAN A: PERMINTAAN MEMBER BARU (PENDING) -->
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-user-clock text-yellow-500"></i> Permintaan Pendaftaran Member Baru</h3>
+                        <div class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full leading-normal text-left">
+                                    <thead>
+                                        <tr class="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider font-bold border-b border-gray-200">
+                                            <th class="px-6 py-4">Nama Pendaftar</th>
+                                            <th class="px-6 py-4">Nomor WhatsApp</th>
+                                            <th class="px-6 py-4 text-center">Aksi Verifikasi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-sm">
+                                        <?php if($result_member->num_rows > 0): ?>
+                                            <?php while($row_m = $result_member->fetch_assoc()): ?>
+                                            <tr class="hover:bg-yellow-50/50 transition border-b border-gray-100">
+                                                <td class="px-6 py-4 font-bold text-gray-800"><?= htmlspecialchars($row_m['nama']) ?></td>
+                                                <td class="px-6 py-4 text-blue-600 font-semibold">
+                                                    <a href="https://wa.me/<?= htmlspecialchars($row_m['no_whatsapp']) ?>" target="_blank" class="hover:underline">
+                                                        <i class="fab fa-whatsapp text-green-500"></i> <?= htmlspecialchars($row_m['no_whatsapp']) ?>
+                                                    </a>
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <form method="POST" action="" class="flex justify-center gap-2">
+                                                        <input type="hidden" name="id_member" value="<?= $row_m['id'] ?>">
+                                                        <input type="hidden" name="action_member" value="1">
+                                                        <button type="submit" name="status_baru" value="Aktif" class="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">
+                                                            <i class="fas fa-check"></i> Setujui
+                                                        </button>
+                                                        <button type="submit" name="status_baru" value="Ditolak" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm transition" onclick="return confirm('Yakin menolak pendaftaran ini?');">
+                                                            <i class="fas fa-times"></i> Tolak
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <tr>
+                                                <td colspan="3" class="px-6 py-6 text-center text-gray-400 font-medium bg-gray-50/50">
+                                                    Tidak ada permintaan pendaftaran member baru saat ini.
+                                                </td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- BAGIAN B: DAFTAR MEMBER AKTIF -->
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-users text-blue-500"></i> Daftar Pelanggan Member Aktif (Masa Aktif 1 Bulan)</h3>
+                        <div class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full leading-normal text-left">
+                                    <thead>
+                                        <tr class="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider font-bold border-b border-gray-200">
+                                            <th class="px-6 py-4">Nama Member</th>
+                                            <th class="px-6 py-4">Nomor WhatsApp</th>
+                                            <th class="px-6 py-4 text-center">Poin Loyalitas</th>
+                                            <th class="px-6 py-4 text-center">Status Akun</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-sm">
+                                        <?php if($result_member_aktif->num_rows > 0): ?>
+                                            <?php while($row_akt = $result_member_aktif->fetch_assoc()): ?>
+                                            <tr class="hover:bg-gray-50/50 transition border-b border-gray-100">
+                                                <td class="px-6 py-4 font-bold text-gray-800"><?= htmlspecialchars($row_akt['nama']) ?></td>
+                                                <td class="px-6 py-4 text-blue-600 font-semibold">
+                                                    <a href="https://wa.me/<?= htmlspecialchars($row_akt['no_whatsapp']) ?>" target="_blank" class="hover:underline">
+                                                        <i class="fab fa-whatsapp text-green-500"></i> <?= htmlspecialchars($row_akt['no_whatsapp']) ?>
+                                                    </a>
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full border border-yellow-300">
+                                                        <i class="fas fa-star text-yellow-500"></i> <?= $row_akt['poin'] ?? 0 ?> Poin
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <span class="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">
+                                                        Aktif
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <tr>
+                                                <td colspan="4" class="px-6 py-6 text-center text-gray-400 font-medium bg-gray-50/50">
+                                                    Belum ada member yang berstatus aktif.
+                                                </td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
             <?php elseif ($page == 'transaksi'): ?>
-                <!-- VIEW MENU 3: KELOLA ANTREAN -->
+                <!-- VIEW MENU 3: KELOLA ANTREAN TRANSAKSI -->
                 <div class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
                     <div class="overflow-x-auto">
                         <table class="min-w-full leading-normal text-left">
@@ -287,7 +349,6 @@ if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
                                             <p><i class="fas fa-motorcycle text-blue-400 w-4"></i> <?= htmlspecialchars($row['opsi_pengiriman']) ?></p>
                                             <p><i class="fas fa-wallet text-green-400 w-4"></i> <?= htmlspecialchars($row['metode_pembayaran']) ?></p>
                                             
-                                            <!-- LINK BUKTI PEMBAYARAN -->
                                             <?php if(!empty($row['bukti_pembayaran'])): ?>
                                                 <p class="mt-1">
                                                     <i class="fas fa-image text-purple-500 w-4"></i> 
@@ -299,8 +360,6 @@ if ($page == 'transaksi') { $header_title = "Kelola Antrean Cucian"; }
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center">
-                                        
-                                        <!-- Tombol Cepat Verifikasi jika Status Menunggu Konfirmasi -->
                                         <?php if($row['stats'] == 'Menunggu Konfirmasi Admin'): ?>
                                             <div class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-left">
                                                 <p class="text-xs font-bold text-orange-800 mb-2"><i class="fas fa-exclamation-circle"></i> Perlu Verifikasi Pembayaran</p>
